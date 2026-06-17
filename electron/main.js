@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron')
 const path = require('path')
+const fs = require('fs')
 const { scanFonts, getFontInfo } = require('./font-scanner')
 
 let mainWindow = null
@@ -63,14 +64,26 @@ ipcMain.handle('get-font-info', async (_, fontPath) => {
   }
 })
 
-ipcMain.handle('save-image-dialog', async () => {
+ipcMain.handle('save-image-dialog', async (_, defaultName) => {
+  const fileName = (defaultName || 'font-preview') + '.png'
   const result = await dialog.showSaveDialog(mainWindow, {
     title: '导出字体预览图片',
-    defaultPath: path.join(app.getPath('pictures'), 'font-preview.png'),
+    defaultPath: path.join(app.getPath('pictures'), fileName),
     filters: [
       { name: 'PNG 图片', extensions: ['png'] },
       { name: 'JPEG 图片', extensions: ['jpg', 'jpeg'] }
     ]
   })
   return result
+})
+
+ipcMain.handle('save-image-file', async (_, { filePath, dataUrl }) => {
+  try {
+    const base64 = dataUrl.split(',')[1]
+    const buffer = Buffer.from(base64, 'base64')
+    fs.writeFileSync(filePath, buffer)
+    return { success: true, filePath }
+  } catch (error) {
+    return { success: false, error: error.message }
+  }
 })

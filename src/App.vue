@@ -691,20 +691,30 @@ function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
 
 async function saveCanvasAsImage(canvas, defaultName) {
   const dataUrl = canvas.toDataURL('image/png')
+
+  if (window.electronAPI && window.electronAPI.saveImageDialog && window.electronAPI.saveImageFile) {
+    const dialogResult = await window.electronAPI.saveImageDialog(defaultName)
+    if (dialogResult.canceled || !dialogResult.filePath) return
+
+    const saveResult = await window.electronAPI.saveImageFile({
+      filePath: dialogResult.filePath,
+      dataUrl
+    })
+    if (saveResult.success) {
+      return saveResult
+    } else {
+      console.error('保存图片失败:', saveResult.error)
+    }
+    return
+  }
+
   const base64 = dataUrl.split(',')[1]
   const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0))
   const blob = new Blob([bytes], { type: 'image/png' })
 
-  let filePath = null
-  if (window.electronAPI && window.electronAPI.saveImageDialog) {
-    const result = await window.electronAPI.saveImageDialog()
-    if (result.canceled || !result.filePath) return
-    filePath = result.filePath
-  }
-
   const link = document.createElement('a')
   link.href = URL.createObjectURL(blob)
-  link.download = filePath ? filePath.split(/[/\\]/).pop() : `${defaultName || 'font-preview'}.png`
+  link.download = `${defaultName || 'font-preview'}.png`
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)
